@@ -5,8 +5,8 @@ Plugin URI: https://rave.flutterwave.com/
 description: Rave payment gateway plugin for Paid Membership Pro. Supports NGN, KES, GHS and USD 
 Version: 1.0
 Author: Oluwole Adebiyi (King Flamez)
-Author URI: http://flamez.com.ng
-License: MIT
+Author URI: https://github.com/kingflamez
+License: GPLv2 or later
 */
 
 defined( 'ABSPATH' ) or die( 'No script kiddies please!' );

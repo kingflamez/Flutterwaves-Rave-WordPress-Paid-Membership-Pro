@@ -1,11 +1,12 @@
 === Rave Payment Gateway for Paid Membership Pro ===
 Contributors: kingflamez
-Donate link: https://paystack.com/demo
+Donate link: https://rave.flutterwave.com/pay/creativepe6u
 Tags: rave, flutterwave, payment gateway, bank account, credit card, debit card, nigeria, kenya, ghana, international, mastercard, visa, PMPro, Paid Membership Pro, Wordpress.
 Requires at least: 3.1
 Tested up to: 4.9.4
 Stable tag: 1.0
-License: MIT
+License: GPLv2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 Accept Credit card, Debit card and Bank account payment on Paid Membership Pro with the Rave payment gateway.
 
