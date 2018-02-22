@@ -12,7 +12,7 @@ Accept Credit card, Debit card and Bank account payment on Paid Membership Pro w
 
 = Description ==
 
-With this plugin you Pay with Paystack on Paid Membership Pro Plugin.
+With this plugin you Pay with Rave on Paid Membership Pro Plugin.
 
 
 = Plugin Features =

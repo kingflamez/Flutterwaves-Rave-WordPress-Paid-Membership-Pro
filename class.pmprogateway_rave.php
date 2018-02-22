@@ -339,7 +339,11 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 							$order->shorterror = "Invalid billing period: " . $order->BillingPeriod;
 							return false;
 						}
+
+						echo "Not supported Yet";
+
 						//Recurring Coming Soon
+						exit;
 					}
 					else
 					{
