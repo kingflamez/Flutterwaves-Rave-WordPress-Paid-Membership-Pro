@@ -1,13 +1,28 @@
 <?php
-/*
-Plugin Name: Rave Flutterwave for Paid Membership Pro
-Plugin URI: https://rave.flutterwave.com/
-description: Rave payment gateway plugin for Paid Membership Pro. Supports NGN, KES, GHS and USD 
-Version: 1.0
-Author: Oluwole Adebiyi (King Flamez)
-Author URI: https://github.com/kingflamez
-License: GPLv2 or later
-*/
+/**
+ *
+ * @link              https://rave.flutterwave.com/
+ * @since             1.0.0
+ * @package           Rave_Flutterwave_PMPro
+ *
+ * @wordpress-plugin
+ * Plugin Name:       Rave Flutterwave for Paid Membership Pro
+ * Plugin URI:        https://rave.flutterwave.com/
+ * Description:       Rave payment gateway for Paid Membership Pro. Supports NGN, KES, GHS and USD 
+ * Version:           1.0.0
+ * Author:            Oluwole Adebiyi (King Flamez)
+ * Author URI:        https://github.com/kingflamez
+ * License:           GPL-2.0+
+ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ */
+
+
+/**
+ * Currently plugin version.
+ * Start at version 1.0.0 and use SemVer - https://semver.org
+ * Rename this for your plugin and update it as you release new versions.
+ */
+define( 'PLUGIN_NAME_VERSION', '1.0.0' );
 
 defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 if (!function_exists('KKD_rave_pmp_gateway_load')) {

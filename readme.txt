@@ -1,7 +1,7 @@
 === Rave Payment Gateway for Paid Membership Pro ===
-Contributors: kingflamez
+Contributors: flamekeed
 Donate link: https://rave.flutterwave.com/pay/creativepe6u
-Tags: rave, flutterwave, payment gateway, bank account, credit card, debit card, nigeria, kenya, ghana, international, mastercard, visa, PMPro, Paid Membership Pro, Wordpress.
+Tags: rave, flutterwave, payment gateway, bank account, credit card, debit card, nigeria, kenya, ghana, international, mastercard, visa, PMPro, Paid Membership Pro, WordPress.
 Requires at least: 3.1
 Tested up to: 4.9.4
 Stable tag: 1.0
@@ -35,3 +35,14 @@ If you have suggestions or a new feature request, feel free to get in touch with
 4.  Activate the plugin.
 5.  Under Paid Membership Pro payments, configure your api keys under api keys settings.
 
+== Frequently Asked Questions == 
+=How do I get my API keys=
+Visit [Rave](https://rave.flutterwave.com/)
+
+= I need help installing, configuring, or customizing the plugin. =
+Please visit [the Github page at] https://github.com/kingflamez/Flutterwaves-Rave-WordPress-Paid-Membership-Pro) for more documentation.
+
+= I found a bug in the plugin. =
+Please post it in the [Github Issue](https://github.com/kingflamez/Flutterwaves-Rave-WordPress-Paid-Membership-Pro/issues) and we'll fix it right away. Thanks for helping. 
+
+== Changelog ==
