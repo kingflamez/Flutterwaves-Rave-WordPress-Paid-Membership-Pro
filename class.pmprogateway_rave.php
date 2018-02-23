@@ -527,7 +527,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				            if ($this->requeryCount > 4) {
 				                $morder->Gateway->failed($morder,$resp->data);
 				            } else {
-				                //sleep(3);
+				                sleep(3);
 				                $morder->Gateway->requery($morder);
 				            }
 				        }
@@ -535,7 +535,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				        if ($this->requeryCount > 4) {
 				            $morder->Gateway->failed($morder,$resp->data);
 				        } else {
-				            //sleep(3);
+				            sleep(3);
 				            $morder->Gateway->requery($morder);
 				        }
 				    }
