@@ -16,13 +16,7 @@
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  */
 
-
-/**
- * Currently plugin version.
- * Start at version 1.0.0 and use SemVer - https://semver.org
- * Rename this for your plugin and update it as you release new versions.
- */
-define( 'PLUGIN_NAME_VERSION', '1.0.0' );
+define('Rave_Flutterwave_PMPro', '1.0.0' );
 
 defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 if (!function_exists('KKD_rave_pmp_gateway_load')) {
@@ -70,6 +64,8 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					//add fields to payment settings
 					add_filter('pmpro_payment_options', array('PMProGateway_rave', 'pmpro_payment_options'));
 					add_filter('pmpro_payment_option_fields', array('PMProGateway_rave', 'pmpro_payment_option_fields'), 10, 2);
+					add_action('wp_ajax_kkd_pmpro_rave_ipn', array('PMProGateway_rave', 'kkd_pmpro_rave_ipn'));
+					add_action('wp_ajax_nopriv_kkd_rave_ipn', array('PMProGateway_rave', 'kkd_pmpro_rave_ipn'));
 					//code to add at checkout
 					$gateway = pmpro_getGateway();
 					if($gateway == "rave")
@@ -85,6 +81,38 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 						// custom confirmation page
 						add_filter('pmpro_pages_shortcode_confirmation', array('PMProGateway_rave', 'pmpro_pages_shortcode_confirmation'), 20, 1);
 					}
+				}
+
+
+				function kkd_pmpro_rave_ipn()
+				{
+					global $wpdb;
+					
+					define('SHORTINIT', true);
+					$input = @file_get_contents("php://input");
+					$event = json_decode($input);
+					
+					switch ($event->event) {
+						case 'subscription.create':
+
+							break;
+						case 'subscription.disable':
+							break;
+						case 'charge.success':
+							$morder = new MemberOrder($event->data->reference);
+							$morder->getMembershipLevel();
+							$morder->getUser();
+							$morder->Gateway->pmpro_pages_shortcode_confirmation('', $event->data->reference);
+							break;
+						case 'invoice.create':
+							self::renewpayment($event);
+						case 'invoice.update':
+							self::renewpayment($event);
+
+							break;
+					}
+					http_response_code(200);
+					exit();
 				}
 
 				/**
@@ -175,6 +203,15 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 						<td colspan="2">
 							<strong><?php _e('Note', 'paid-memberships-pro' );?>:</strong> <?php _e('Get your API keys from <a target="_blank" href="https://rave.flutterwave.com/">https://rave.flutterwave.com/</a>', 'paid-memberships-pro' );?>
 						</td>	
+					</tr>
+					<tr class="gateway gateway_rave" <?php if($gateway != "rave") { ?>style="display: none;"<?php } ?>>
+						<th scope="row" valign="top">
+							<label><?php _e('Webhook', 'pmpro');?>:</label>
+						</th>
+						<td>
+							<p><?php _e('To integrate this plugin fully, add this URL to your webhook on your admin', 'pmpro');?> <pre><?php echo admin_url("admin-ajax.php") . "?action=kkd_pmpro_rave_ipn";?></pre></p>
+							
+						</td>
 					</tr>
 					<tr class="gateway gateway_rave" <?php if($gateway != "rave") { ?>style="display: none;"<?php } ?>>
 						<th scope="row" valign="top">	
@@ -304,7 +341,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					//taxes on the amount
 					$amount = $order->PaymentAmount;
 					$amount_tax = $order->getTaxForPrice($amount);			
-					$amount = round((float)$amount + (float)$amount_tax, 2);			
+					$amount = round((float)$amount + (float)$amount_tax, 2)+0;			
 					
 					//build RAVE
 					$environment = pmpro_getOption("gateway_environment");
@@ -338,30 +375,86 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				    // Client Parameters
 
 				    if(pmpro_isLevelRecurring($order->membership_level))
-					{
-						//convert billing period
-						if($order->BillingPeriod == "Day")
-							$period = "daily";
-						elseif($order->BillingPeriod == "Week")
-							$period = "weekly";
-						elseif($order->BillingPeriod == "Month")
-							$period = "monthly";
-						elseif($order->BillingPeriod == "Year")
-							$period = "yearly";				
+						{
+							//convert billing period
+							if($order->BillingPeriod == "Day")
+								$period = "daily";
+							elseif($order->BillingPeriod == "Week")
+								$period = "weekly";
+							elseif($order->BillingPeriod == "Month")
+								$period = "monthly";
+							elseif($order->BillingPeriod == "Year")
+								$period = "yearly";				
+							else
+							{
+								$order->error = "Invalid billing period: " . $order->BillingPeriod;
+								$order->shorterror = "Invalid billing period: " . $order->BillingPeriod;
+								return false;
+							}
+
+							if ($order->membership_level->cycle_number==1) {
+								$interval = $period;
+							} else {
+								$interval = "every ". $order->membership_level->cycle_number ." ".strtolower($order->BillingPeriod)."s";
+							}
+
+							$duration = $order->membership_level->billing_limit;
+							$url = $baseUrl . '/v2/gpx/paymentplans/create';
+
+							$header = array(
+								'Content-Type' => 'application/x-www-form-urlencoded'
+							);
+								// make request to endpoint.
+
+							$args = array(
+								'body' => "name=" . $order->membership_level->name . "&amount=" . $amount . "&interval=" . $interval . "&duration=" . $duration . "&seckey=" . $secretKey,
+								'header' => $header
+							);
+
+							$response = wp_remote_post($url, $args);
+							$resp = json_decode(wp_remote_retrieve_body($response));
+
+							$postfields = array();
+							$postfields['PBFPubKey'] = $publicKey;
+							$postfields['customer_email'] = $current_user->user_email;
+							$postfields['customer_firstname'] = $firstname;
+							$postfields['custom_logo'] = pmpro_getOption("rave_merchant_logo");
+							$postfields['customer_lastname'] = $lastname;
+							$postfields['custom_description'] = "Payment for Membership level: " . $order->membership_level->name . " on " . get_bloginfo('name');
+							$postfields['custom_title'] = get_bloginfo('name');
+							$postfields['customer_phone'] = $order->billing->phone;
+							$postfields['payment_plan'] = $resp->data->id;
+							$postfields['country'] = $country;
+							$postfields['redirect_url'] = $redirectURL;
+							$postfields['txref'] = $ref;
+							$postfields['payment_method'] = pmpro_getOption("rave_payment_method");
+							$postfields['amount'] = $initial_payment + 0;
+							$postfields['currency'] = $pmpro_currency;
+							$postfields['hosted_payment'] = 1;
+							ksort($postfields);
+							$stringToHash = "";
+							foreach ($postfields as $key => $val) {
+								$stringToHash .= $val;
+							}
+							$stringToHash .= $secretKey;
+							$hashedValue = hash('sha256', $stringToHash);
+
+							$transactionData = array_merge($postfields, array('integrity_hash' => $hashedValue));
+							$json = json_encode($transactionData);
+							$htmlOutput = "
+									<script type='text/javascript' src='" . $baseUrl . "/flwv3-pug/getpaidx/api/flwpbf-inline.js'></script>
+									<script>
+									document.addEventListener('DOMContentLoaded', function(event) {
+										var data = JSON.parse('" . json_encode($transactionData = array_merge($postfields, array('integrity_hash' => $hashedValue))) . "');
+										getpaidSetup(data);
+								});
+									</script>
+									";
+							echo $htmlOutput;
+							exit;
+						}
 						else
 						{
-							$order->error = "Invalid billing period: " . $order->BillingPeriod;
-							$order->shorterror = "Invalid billing period: " . $order->BillingPeriod;
-							return false;
-						}
-
-						echo "Not supported Yet";
-
-						//Recurring Coming Soon
-						exit;
-					}
-					else
-					{
 
 					    $postfields = array();
 					    $postfields['PBFPubKey'] = $publicKey;
@@ -464,7 +557,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 
 								//Verify Transaction
 								if (isset($_GET['txref'])) {
-									$morder->Gateway->requery($morder);
+									$morder->Gateway->kkd_pmpro_requery($morder);
 								}
 								
 
@@ -483,7 +576,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					
 				}
 
-				function requery(&$morder)
+				function kkd_pmpro_requery(&$morder)
 				{	
 					$mode = pmpro_getOption("gateway_environment");
 					
@@ -500,43 +593,36 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				        'SECKEY' => pmpro_getOption("rave_secret_key"),
 				        'last_attempt' => '1'
 				        // 'only_successful' => '1'
-				    );
-				    // make request to endpoint.
-				    $data_string = json_encode($data);
+						);
+						// make request to endpoint.
 
-				    $ch = curl_init();
-				    curl_setopt($ch, CURLOPT_URL, $apiLink . 'flwv3-pug/getpaidx/api/xrequery');
-				    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-				    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
-				    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-				    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-				    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-				    $response = curl_exec($ch);
-				    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-				    $header = substr($response, 0, $header_size);
-				    $body = substr($response, $header_size);
-				    curl_close($ch);
-				    $resp = json_decode($response, false);
+						$args = array(
+							'body' => $data
+						);
+						
+						$response = wp_remote_post($apiLink . 'flwv3-pug/getpaidx/api/xrequery', $args );
+						
+						$resp = json_decode(wp_remote_retrieve_body($response));
 
 				    if ($resp && $resp->status === "success") {
 				        if ($resp && $resp->data && $resp->data->status === "successful") {
-				            $morder->Gateway->verifyTransaction($morder,$resp->data);
+				            $morder->Gateway->kkd_pmpro_verifyTransaction($morder,$resp->data);
 				        } elseif ($resp && $resp->data && $resp->data->status === "failed") {
-				                $morder->Gateway->failed($morder,$resp->data);
+				                $morder->Gateway->kkd_pmpro_failed($morder);
 				        } else {
 				            if ($this->requeryCount > 4) {
-				                $morder->Gateway->failed($morder,$resp->data);
+				                $morder->Gateway->kkd_pmpro_failed($morder);
 				            } else {
-				                //sleep(3);
-				                $morder->Gateway->requery($morder);
+				                sleep(3);
+				                $morder->Gateway->kkd_pmpro_requery($morder);
 				            }
 				        }
 				    } else {
 				        if ($this->requeryCount > 4) {
-				            $morder->Gateway->failed($morder,$resp->data);
+				            $morder->Gateway->kkd_pmpro_failed($morder);
 				        } else {
-				            //sleep(3);
-				            $morder->Gateway->requery($morder);
+				            sleep(3);
+				            $morder->Gateway->kkd_pmpro_requery($morder);
 				        }
 				    }
 				}
@@ -546,97 +632,123 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				 * @param string $referenceNumber This should be the reference number of the transaction you want to requery
 				 * @return object
 				 * */
-				function verifyTransaction(&$order,&$data)
+				function kkd_pmpro_verifyTransaction(&$order,&$data)
 				{
-            		global $wpdb, $current_user, $pmpro_currency;
+            global $wpdb, $current_user, $pmpro_currency;
 				    $currency = $pmpro_currency;
 				    $amount = $order->total;
 
-				    if (($data->chargecode == "00" || $data->chargecode == "0") && ($data->amount == $amount) && ($data->currency == $currency)) {
+				    if (($data->chargecode == "00" || $data->chargecode == "0") && ($data->amount >= $amount) && ($data->currency == $currency)) {
 
-	                    $pmpro_level = $wpdb->get_row("SELECT * FROM $wpdb->pmpro_membership_levels WHERE id = '" . (int)$order->membership_id . "' LIMIT 1");
-	                    $pmpro_level = apply_filters("pmpro_checkout_level", $pmpro_level);
-	                    $startdate = apply_filters("pmpro_checkout_start_date", "'" . current_time("mysql") . "'", $order->user_id, $pmpro_level);
+							$pmpro_level = $wpdb->get_row("SELECT * FROM $wpdb->pmpro_membership_levels WHERE id = '" . (int)$order->membership_id . "' LIMIT 1");
+							//$pmpro_level = apply_filters("pmpro_checkout_level", $pmpro_level);
+							$startdate = apply_filters("pmpro_checkout_start_date", "'" . current_time("mysql") . "'", $order->user_id, $pmpro_level);
 
-				    	$startdate = apply_filters("pmpro_checkout_start_date", "'" . current_time("mysql") . "'", $order->user_id, $pmpro_level);
-            
-                        $enddate = "'" . date("Y-m-d", strtotime("+ " . $pmpro_level->expiration_number . " " . $pmpro_level->expiration_period, current_time("timestamp"))) . "'";
+							$enddate = "'" . date("Y-m-d", strtotime("+ " . $pmpro_level->expiration_number . " " . $pmpro_level->expiration_period, current_time("timestamp"))) . "'";
 
-                        if ($order->status != 'success') {
-                          
-                          if (pmpro_changeMembershipLevel($pmpro_level->id, $order->user_id, $order->status)){
-                            $order->membership_id = $pmpro_level->id;
-                            $order->payment_transaction_id = $_REQUEST['txref'];
-                            $order->status = "success";
-                            $order->saveOrder();
-                          }
-                            
-                        }
+							if ($pmpro_level->cycle_period) {
+								$date = strtotime("+" . $pmpro_level->cycle_number . " " . strtolower($pmpro_level->cycle_period));
 
-                        if (!empty($order)) {
-                          $pmpro_invoice = new MemberOrder($order->id);
-                        }else {
-                          $pmpro_invoice = NULL;
-                        }
+								$enddate = date('Y-m-d H:i:s', $date);
+							}
 
-                        $current_user->membership_level = $pmpro_level; //make sure they have the right level info
-                        $current_user->membership_level->enddate = $enddate;
-                        if($current_user->ID) {
-                          $current_user->membership_level = pmpro_getMembershipLevelForUser($current_user->ID);
-                          // echo "interesting";
-                        }
-                        
-                        //send email to member
-                        $pmproemail = new PMProEmail();
-                        $pmproemail->sendCheckoutEmail($current_user, $invoice);
-                        //send email to admin
-                        $pmproemail = new PMProEmail();
-                        $pmproemail->sendCheckoutAdminEmail($current_user, $invoice);
-                        // echo "<pre>";
-                        // print_r($pmpro_level);
+							if ($order->status != 'success') {
 
-                        $content = "<ul>
-                          <li><strong>Account:</strong> ".$current_user->display_name." (".$current_user->user_email.")</li>
-                          <li><strong>Order:</strong> ".$order->code."</li>
-                          <li><strong>Membership Level:</strong> ".$pmpro_level->name."</li>
-                          <li><strong>Amount Paid:</strong> ".$order->total." ".$pmpro_currency."</li>
-                          </ul>";
 
-                        ob_start();
-                        if(file_exists(get_stylesheet_directory() . "/paid-memberships-pro/pages/confirmation.php")) {
-                          include(get_stylesheet_directory() . "/paid-memberships-pro/pages/confirmation.php");
-                        }else{
-                          include(PMPRO_DIR . "/pages/confirmation.php");
-                        }
-                        
-                        $content .= ob_get_contents();
-                        ob_end_clean();
+									$custom_level = array(
+										'user_id' => $current_user->ID,
+										'membership_id' => $pmpro_level->id,
+										'code_id' => $discount_code_id,
+										'initial_payment' => $pmpro_level->initial_payment,
+										'billing_amount' => $pmpro_level->billing_amount,
+										'cycle_number' => $pmpro_level->cycle_number,
+										'cycle_period' => $pmpro_level->cycle_period,
+										'billing_limit' => $pmpro_level->billing_limit,
+										'trial_amount' => $pmpro_level->trial_amount,
+										'trial_limit' => $pmpro_level->trial_limit,
+										'startdate' => $startdate,
+										'enddate' => $enddate
+									);
+								
+								if (pmpro_changeMembershipLevel($custom_level, $order->user_id, 'changed')){
+									$order->membership_id = $pmpro_level->id;
+									$order->payment_transaction_id = $_REQUEST['txref'];
+									$order->status = "success";
+									$order->saveOrder();
+								}
+									
+							}
 
-                        echo $content;
+							if (!empty($order)) {
+								$pmpro_invoice = new MemberOrder($order->id);
+							}else {
+								$pmpro_invoice = NULL;
+							}
 
-                        exit;
+							$current_user->membership_level = $pmpro_level; //make sure they have the right level info
+							$current_user->membership_level->enddate = $enddate;
+							if($current_user->ID) {
+								$current_user->membership_level = pmpro_getMembershipLevelForUser($current_user->ID);
+								// echo "interesting";
+							}
+							
+							//send email to member
+							$pmproemail = new PMProEmail();
+							$pmproemail->sendCheckoutEmail($current_user, $invoice);
+							//send email to admin
+							$pmproemail = new PMProEmail();
+							$pmproemail->sendCheckoutAdminEmail($current_user, $invoice);
+							// echo "<pre>";
+							// print_r($pmpro_level);
+
+							$content = "<ul>
+								<li><strong>Account:</strong> ".$current_user->display_name." (".$current_user->user_email.")</li>
+								<li><strong>Order:</strong> ".$order->code."</li>
+								<li><strong>Membership Level:</strong> ".$pmpro_level->name."</li>
+								<li><strong>Amount Paid:</strong> ".$order->total." ".$pmpro_currency."</li>
+								</ul>";
+
+							ob_start();
+							if(file_exists(get_stylesheet_directory() . "/paid-memberships-pro/pages/confirmation.php")) {
+								include(get_stylesheet_directory() . "/paid-memberships-pro/pages/confirmation.php");
+							}else{
+								include(PMPRO_DIR . "/pages/confirmation.php");
+							}
+							
+							$content .= ob_get_contents();
+							ob_end_clean();
+
+							echo $content;
+
+							exit;
 				    } else {
-				        return failed($data);
+							if ($data->amount < $amount) {
+								return $morder->Gateway->kkd_pmpro_failed($order, "Amount was not enough");
+							} elseif ($data->currency != $currency) {
+								return $morder->Gateway->kkd_pmpro_failed($order, "Wrong Currency");
+							}
+				        return $morder->Gateway->kkd_pmpro_failed($order);
 				    }
 				}
 
-				function failed(&$order,&$data)
+				function kkd_pmpro_failed(&$order,&$message='')
 				{
 
-               		echo $order->shorterror;
+         	echo $order->shorterror;
 
 					$error = ($_GET['cancelled'] == true) ? "You cancelled the transaction" : "Transaction Failed";
 
-	                $content = "<h2>".$error."</h2>";
+					$content = "<h2>".$error."</h2>";
+					$content .= "<p>".$message."</p>";
 
-    				$order->status = "cancelled";
-    				$order->shorterror = $error;
+					$order->status = "cancelled";
+					$order->shorterror = $error;
 
-	                echo $content;
+					echo $content;
 
-        			$order->saveOrder();
+					$order->saveOrder();
 
-	                exit;
+					exit;
 				}
 
 				function delete(&$order) {
