@@ -95,27 +95,96 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					$input = @file_get_contents("php://input");
 					$event = json_decode($input);
 
-					switch ($event->event) {
-						case 'subscription.create':
-
-							break;
-						case 'subscription.disable':
-							break;
-						case 'charge.success':
-							$morder = new MemberOrder($event->data->reference);
-							$morder->getMembershipLevel();
-							$morder->getUser();
-							$morder->Gateway->pmpro_pages_shortcode_confirmation('', $event->data->reference);
-							break;
-						case 'invoice.create':
-							self::renewpayment($event);
-						case 'invoice.update':
-							self::renewpayment($event);
-
-							break;
+					if ($event->paymentPlan != null) {
+						self::renewPlan($event);
 					}
 					http_response_code(200);
 					exit();
+				}
+
+				static function renewPlan($event)
+				{
+					global $wp, $wpdb;
+
+					if (isset($event->status) && ($event->status == "successful")) {
+
+						$amount = $event->amount / 100;
+						$old_order = new MemberOrder();
+						$subscription_code = $event->paymentPlan;
+						$email = $event->customer->email;
+						$old_order->getLastMemberOrderBySubscriptionTransactionID($subscription_code);
+
+						if (empty($old_order)) {
+							exit();
+						}
+
+						$user_id = $old_order->user_id;
+						$user = get_userdata($user_id);
+						$user->membership_level = pmpro_getMembershipLevelForUser($user_id);
+
+						if (empty($user)) {
+							exit();
+						}
+
+						$morder = new MemberOrder();
+						$morder->user_id = $old_order->user_id;
+						$morder->membership_id = $old_order->membership_id;
+						$morder->InitialPayment = $amount;	//not the initial payment, but the order class is expecting this
+						$morder->PaymentAmount = $amount;
+						$morder->payment_transaction_id = $event->flwref;
+						$morder->subscription_transaction_id = $subscription_code;
+
+						$morder->gateway = $old_order->gateway;
+						$morder->gateway_environment = $old_order->gateway_environment;
+
+						$morder->Email = $email;
+						$pmpro_level = $wpdb->get_row("SELECT * FROM $wpdb->pmpro_membership_levels WHERE id = '" . (int)$morder->membership_id . "' LIMIT 1");
+						$pmpro_level = apply_filters("pmpro_checkout_level", $pmpro_level);
+						$startdate = apply_filters("pmpro_checkout_start_date", "'" . current_time("mysql") . "'", $morder->user_id, $pmpro_level);
+
+						$enddate = "'" . date("Y-m-d", strtotime("+ " . $pmpro_level->expiration_number . " " . $pmpro_level->expiration_period, current_time("timestamp"))) . "'";
+
+						$custom_level = array(
+							'user_id' => $morder->user_id,
+							'membership_id' => $pmpro_level->id,
+							'code_id' => '',
+							'initial_payment' => $pmpro_level->initial_payment,
+							'billing_amount' => $pmpro_level->billing_amount,
+							'cycle_number' => $pmpro_level->cycle_number,
+							'cycle_period' => $pmpro_level->cycle_period,
+							'billing_limit' => $pmpro_level->billing_limit,
+							'trial_amount' => $pmpro_level->trial_amount,
+							'trial_limit' => $pmpro_level->trial_limit,
+							'startdate' => $startdate,
+							'enddate' => $enddate
+						);
+						
+						//get CC info that is on file
+						$morder->expirationmonth = get_user_meta($user_id, "pmpro_ExpirationMonth", true);
+						$morder->expirationyear = get_user_meta($user_id, "pmpro_ExpirationYear", true);
+						$morder->ExpirationDate = $morder->expirationmonth . $morder->expirationyear;
+						$morder->ExpirationDate_YdashM = $morder->expirationyear . "-" . $morder->expirationmonth;
+
+						
+						//save
+						if ($morder->status != 'success') {
+
+							if (pmpro_changeMembershipLevel($custom_level, $morder->user_id, 'changed')) {
+								$morder->status = "success";
+								$morder->saveOrder();
+							}
+
+						}
+						$morder->getMemberOrderByID($morder->id);
+
+						//email the user their invoice
+						$pmproemail = new PMProEmail();
+						$pmproemail->sendInvoiceEmail($user, $morder);
+
+						do_action('pmpro_subscription_payment_completed', $morder);
+						exit();
+					}
+
 				}
 
 				/**
@@ -145,10 +214,10 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					<span id="pmpro_submit_span">
 						<input type="hidden" name="submit-checkout" value="1" />		
 						<input type="submit" class="pmpro_btn pmpro_btn-submit-checkout" value="<?php if ($pmpro_requirebilling) {
-																																																																														_e('Check Out with Rave', 'pmpro');
-																																																																													} else {
-																																																																														_e('Submit and Confirm', 'pmpro');
-																																																																													} ?> &raquo;" />		
+																						_e('Check Out with Rave', 'pmpro');
+																					} else {
+																						_e('Submit and Confirm', 'pmpro');
+																					} ?> &raquo;" />		
 					</span>
 					<?php
 				
@@ -426,21 +495,38 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 						$interval = "every " . $order->membership_level->cycle_number . " " . strtolower($order->BillingPeriod) . "s";
 					}
 
-					$duration = $order->membership_level->billing_limit;
-					$url = $baseUrl . '/v2/gpx/paymentplans/create';
-
 					$header = array(
 						'Content-Type' => 'application/x-www-form-urlencoded'
 					);
-								// make request to endpoint.
+					
+					$duration = $order->membership_level->billing_limit;
+
+
+					$url = $baseUrl . '/v2/gpx/paymentplans/query?seckey='. $secretKey .'&q='. $order->membership_level->name .' - '. $amount .' - '. $interval;
 
 					$args = array(
-						'body' => "name=" . $order->membership_level->name . "&amount=" . $amount . "&interval=" . $interval . "&duration=" . $duration . "&seckey=" . $secretKey,
 						'header' => $header
 					);
 
-					$response = wp_remote_post($url, $args);
+					$response = wp_remote_get($url);
 					$resp = json_decode(wp_remote_retrieve_body($response));
+
+					$payPlan = $resp->data->paymentplans[0]->id;
+
+					if ($resp->data->paymentplans[0]->id < 1) {
+						$url = $baseUrl . '/v2/gpx/paymentplans/create';
+								// make request to endpoint.
+
+						$args = array(
+							'body' => "name=" . $order->membership_level->name . " - " . $amount . " - " . $interval . "&amount=" . $amount . "&interval=" . $interval . "&duration=" . $duration . "&seckey=" . $secretKey,
+							'header' => $header
+						);
+
+						$response = wp_remote_post($url, $args);
+						$resp = json_decode(wp_remote_retrieve_body($response));
+
+						$payPlan = $resp->data->id;
+					}
 
 					$postfields = array();
 					$postfields['PBFPubKey'] = $publicKey;
@@ -451,7 +537,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					$postfields['custom_description'] = "Payment for Membership level: " . $order->membership_level->name . " on " . get_bloginfo('name');
 					$postfields['custom_title'] = get_bloginfo('name');
 					$postfields['customer_phone'] = $order->billing->phone;
-					$postfields['payment_plan'] = $resp->data->id;
+					$postfields['payment_plan'] = $payPlan;
 					$postfields['country'] = $country;
 					$postfields['redirect_url'] = $redirectURL;
 					$postfields['txref'] = $ref;
@@ -693,6 +779,10 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 							'enddate' => $enddate
 						);
 
+						if ($data->paymentplan > 0) {
+							$order->subscription_transaction_id = $data->paymentplan;
+						}
+
 						if (pmpro_changeMembershipLevel($custom_level, $order->user_id, 'changed')) {
 							$order->membership_id = $pmpro_level->id;
 							$order->payment_transaction_id = $_REQUEST['txref'];
@@ -712,7 +802,6 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					$current_user->membership_level->enddate = $enddate;
 					if ($current_user->ID) {
 						$current_user->membership_level = pmpro_getMembershipLevelForUser($current_user->ID);
-								// echo "interesting";
 					}
 							
 							//send email to member
