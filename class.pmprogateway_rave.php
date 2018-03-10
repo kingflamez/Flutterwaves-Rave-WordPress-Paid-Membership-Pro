@@ -96,13 +96,13 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					$event = json_decode($input);
 
 					if ($event->paymentPlan != null) {
-						self::renewPlan($event);
+						self::kkd_pmpro_renewPlan($event);
 					}
 					http_response_code(200);
 					exit();
 				}
 
-				static function renewPlan($event)
+				static function kkd_pmpro_renewPlan($event)
 				{
 					global $wp, $wpdb;
 
@@ -222,8 +222,8 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					<?php
 				
 					//don't show the default
-				return false;
-			}
+					return false;
+				}
 			/**
 			 * Make sure Rave is in the gateways list
 			 */
@@ -425,10 +425,10 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				if (!empty($discount_code_id))
 					$wpdb->query("INSERT INTO $wpdb->pmpro_discount_codes_uses (code_id, user_id, order_id, timestamp) VALUES('" . $discount_code_id . "', '" . $user_id . "', '" . $morder->id . "', now())");
 
-				$morder->Gateway->sendToRave($morder);
+				$morder->Gateway->kkd_pmpro_sendToRave($morder);
 			}
 
-			function sendToRave(&$order)
+			function kkd_pmpro_sendToRave(&$order)
 			{
 				global $pmpro_currency, $current_user;
 
@@ -613,7 +613,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				$morder = new MemberOrder();
 				$found = $morder->getLastMemberOrder(get_current_user_id(), apply_filters("pmpro_confirmation_order_status", array("pending")));
 				if ($found) {
-					$morder->Gateway->delete($morder);
+					$morder->Gateway->kkd_pmpro_delete($morder);
 				}
 
 				if (isset($_REQUEST['error'])) {
@@ -863,7 +863,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 				exit;
 			}
 
-			function delete(&$order)
+			function kkd_pmpro_delete(&$order)
 			{
 
 					//no matter what happens below, we're going to cancel the order in our system
