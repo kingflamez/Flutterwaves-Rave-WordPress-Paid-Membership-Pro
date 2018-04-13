@@ -13,7 +13,8 @@ This is a wordpress payment gateway plugin for Paid Membership Pro that allows y
 
 Accept Credit card, Debit card and Bank account payment on Paid Membership Pro with the Rave payment gateway.
 
-Signup for an account [here](https://rave.flutterwave.com)
+> Signup for a `live` account [here](https://rave.flutterwave.com)
+> Signup for a `test` account [here](https://raveappv2.herokuapp.com)
 
 Rave is available in:
 
