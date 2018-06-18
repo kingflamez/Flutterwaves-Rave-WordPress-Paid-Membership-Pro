@@ -370,7 +370,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 						</th>
 						<td>
 							<input type="text" id="rave_test_public_key" name="rave_test_public_key" size="60" value="<?php echo esc_attr($values['rave_test_public_key']) ?>" />
-							<small><?php _e("<a href='https://raveappv2.herokuapp.com/dashboard/settings/apis' target='_blank'>Test Public key Link</a>", 'paid-memberships-pro'); ?></small>
+							<small><?php _e("<a href='https://ravesandboxapi.flutterwave.com/dashboard/settings/apis' target='_blank'>Test Public key Link</a>", 'paid-memberships-pro'); ?></small>
 						</td>
 					</tr>
 					<tr class="gateway gateway_rave" <?php if ($gateway != "rave") { ?>style="display: none;"<?php 
@@ -380,7 +380,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 						</th>
 						<td>
 							<input type="text" id="rave_test_secret_key" name="rave_test_secret_key" size="60" value="<?php echo esc_attr($values['rave_test_secret_key']) ?>" />
-							<small><?php _e("<a href='https://raveappv2.herokuapp.com/dashboard/settings/apis' target='_blank'>Test Secret key Link</a>", 'paid-memberships-pro'); ?></small>
+							<small><?php _e("<a href='https://ravesandboxapi.flutterwave.com/dashboard/settings/apis' target='_blank'>Test Secret key Link</a>", 'paid-memberships-pro'); ?></small>
 						</td>
 					</tr>
 					<?php
@@ -467,7 +467,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
 					//build RAVE
     $environment = pmpro_getOption("gateway_environment");
 
-    $stagingUrl = 'https://rave-api-v2.herokuapp.com';
+    $stagingUrl = 'https://ravesandboxapi.flutterwave.com';
     $liveUrl = 'https://api.ravepay.co';
 
     $redirectURL = pmpro_url("confirmation", "?level=" . $order->membership_level->id);//urlencode(pmpro_url("checkout", "?level=" . $order->membership_level->id . "&review=" . $order->code))
@@ -691,7 +691,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
         $mode = pmpro_getOption("gateway_environment");
 
         if ($mode == 'sandbox') {
-          $apiLink = "http://flw-pms-dev.eu-west-1.elasticbeanstalk.com/";
+          $apiLink = "https://ravesandboxapi.flutterwave.com/";
         } else {
           $apiLink = "https://api.ravepay.co/";
 
@@ -723,7 +723,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
     $mode = pmpro_getOption("gateway_environment");
 
     if ($mode == 'sandbox') {
-      $apiLink = "http://flw-pms-dev.eu-west-1.elasticbeanstalk.com/";
+      $apiLink = "https://ravesandboxapi.flutterwave.com/";
       $secretKey = pmpro_getOption("rave_test_secret_key");
     } else {
       $apiLink = "https://api.ravepay.co/";
@@ -743,7 +743,7 @@ if (!function_exists('KKD_rave_pmp_gateway_load')) {
       'body' => $data
     );
 
-    $response = wp_remote_post($apiLink . 'flwv3-pug/getpaidx/api/xrequery', $args);
+    $response = wp_remote_post($apiLink . 'flwv3-pug/getpaidx/api/v2/verify', $args);
 
     $resp = json_decode(wp_remote_retrieve_body($response));
 

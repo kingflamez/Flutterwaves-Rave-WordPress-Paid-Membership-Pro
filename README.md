@@ -15,7 +15,7 @@ Accept Credit card, Debit card and Bank account payment on Paid Membership Pro w
 
 > Signup for a `live` account [here](https://rave.flutterwave.com)
 
-> Signup for a `test` account [here](https://raveappv2.herokuapp.com)
+> Signup for a `test` account [here](https://ravesandboxapi.flutterwave.com/)
 
 Rave is available in:
 
