@@ -22,6 +22,7 @@ Rave is available in:
 * __Nigeria__
 * __Ghana__
 * __Kenya__
+* __South Africa__
 
 ## Install
 1. Download the Zip file of this plugin.
